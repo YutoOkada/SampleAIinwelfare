@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>障害福祉の現場 AI活用事例ビューア</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 320px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+                max-height: 400px;
+            }
+        }
+        .case-card {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .case-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .modal-overlay {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+        .admin-badge {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-neutral-50 text-neutral-800">
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl p-6 md:p-8 transform scale-95">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="detailModalTitle" class="text-2xl font-bold text-sky-700"></h2>
+                <button id="closeDetailModal" class="text-neutral-500 hover:text-neutral-800 text-3xl font-light">&times;</button>
+            </div>
+            <div id="detailModalBody" class="space-y-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-neutral-700 border-l-4 border-sky-500 pl-2 mb-2">【具体的な活用事例】</h3>
+                    <p id="detailUseCase" class="text-neutral-700 leading-relaxed"></p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-neutral-700 border-l-4 border-amber-500 pl-2 mb-2">【実績(業務改善)】</h3>
+                    <p id="detailResult" class="text-neutral-700 leading-relaxed"></p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-neutral-700 border-l-4 border-teal-500 pl-2 mb-2">【ただの効率化ではない部分（福祉的配慮）】</h3>
+                    <p id="detailWelfare" class="text-neutral-700 leading-relaxed"></p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-neutral-700 border-l-4 border-red-500 pl-2 mb-2">【動画集】</h3>
+                    <div id="detailVideo" class="text-neutral-700 leading-relaxed"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit/Add Modal -->
+    <div id="editModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl p-6 md:p-8 transform scale-95">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="editModalTitle" class="text-2xl font-bold text-sky-700">事例を編集</h2>
+                <button id="closeEditModal" class="text-neutral-500 hover:text-neutral-800 text-3xl font-light">&times;</button>
+            </div>
+            <form id="editForm" class="space-y-4">
+                <input type="hidden" id="editRecordId" />
+                <div>
+                    <label class="block text-sm font-medium text-neutral-700 mb-1">タイトル *</label>
+                    <input type="text" id="editTitle" required class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-700 mb-1">職種 *</label>
+                        <input type="text" id="editRole" required class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-700 mb-1">事業所種別 *</label>
+                        <input type="text" id="editServiceType" required class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-700 mb-1">業務内容 *</label>
+                        <input type="text" id="editTask" required class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-neutral-700 mb-1">具体的な活用事例 *</label>
+                    <textarea id="editUseCase" required rows="3" class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-neutral-700 mb-1">実績（業務改善） *</label>
+                    <textarea id="editResult" required rows="3" class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-neutral-700 mb-1">福祉的配慮 *</label>
+                    <textarea id="editWelfare" required rows="3" class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-neutral-700 mb-1">動画URL（任意）</label>
+                    <input type="url" id="editVideoUrl" placeholder="https://..." class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500">
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" id="cancelEdit" class="px-6 py-2 bg-neutral-500 text-white rounded-md hover:bg-neutral-600">キャンセル</button>
+                    <button type="submit" class="px-6 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content bg-white w-full max-w-md rounded-xl shadow-2xl p-6 md:p-8 transform scale-95">
+            <h2 class="text-2xl font-bold text-sky-700 mb-4">管理者パスワード</h2>
+            <p class="text-neutral-600 mb-4">事例の編集・追加・削除には管理者パスワードが必要です。</p>
+            <form id="passwordForm">
+                <input type="password" id="passwordInput" placeholder="パスワードを入力" class="w-full p-2 border border-neutral-300 rounded-md focus:ring-sky-500 focus:border-sky-500 mb-4">
+                <div id="passwordError" class="text-red-600 text-sm mb-2 hidden">パスワードが正しくありません。</div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" id="cancelPassword" class="px-6 py-2 bg-neutral-500 text-white rounded-md hover:bg-neutral-600">キャンセル</button>
+                    <button type="submit" class="px-6 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700">確認</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center my-8">
+            <div class="flex justify-between items-center mb-4">
+                <div></div>
+                <h1 class="text-3xl md:text-4xl font-bold text-sky-800">障害福祉の現場 AI活用事例ビューア</h1>
+                <button id="adminToggle" class="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors text-sm">
+                    管理者モード
+                </button>
+            </div>
+            <div id="adminBadge" class="hidden mb-4">
+                <span class="admin-badge inline-block bg-red-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                    🔒 管理者モード有効
+                </span>
+            </div>
+            <p class="mt-4 text-lg text-neutral-600 max-w-3xl mx-auto">
+                障害福祉の現場で「すぐに試せる」AI活用事例50事例以上を、対話的に検索・閲覧できます。日々の業務を「福祉的配慮を持ったAI活用」で改善するヒントを見つけてください。
+            </p>
+        </header>
+
+        <main>
+            <section id="filters" class="sticky top-0 z-40 bg-neutral-50/95 backdrop-blur-md py-4 mb-6 shadow-sm rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
+                    <div class="md:col-span-4">
+                        <label for="searchInput" class="block text-sm font-medium text-neutral-700 mb-1">フリーワード検索</label>
+                        <input type="text" id="searchInput" placeholder="例： 日報、SST、モニタリング..." class="w-full p-2 border border-neutral-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label for="roleFilter" class="block text-sm font-medium text-neutral-700 mb-1">職種で絞り込み</label>
+                        <select id="roleFilter" class="w-full p-2 border border-neutral-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 bg-white"></select>
+                    </div>
+                    <div>
+                        <label for="serviceFilter" class="block text-sm font-medium text-neutral-700 mb-1">事業所種別で絞り込み</label>
+                        <select id="serviceFilter" class="w-full p-2 border border-neutral-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 bg-white"></select>
+                    </div>
+                    <div>
+                        <label for="taskFilter" class="block text-sm font-medium text-neutral-700 mb-1">業務内容で絞り込み</label>
+                        <select id="taskFilter" class="w-full p-2 border border-neutral-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 bg-white"></select>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <button id="resetFilters" class="flex-1 p-2 bg-neutral-600 text-white rounded-md shadow-sm hover:bg-neutral-700 transition-colors">リセット</button>
+                        <button id="addCaseBtn" class="hidden flex-1 p-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 transition-colors">+ 新規追加</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="dashboard" class="mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-1 bg-white p-6 rounded-lg shadow-md flex flex-col justify-center">
+                        <h2 class="text-xl font-semibold text-neutral-700 mb-2">該当事例</h2>
+                        <p class="text-5xl font-bold text-sky-600"><span id="displayedCount">0</span> <span class="text-3xl text-neutral-500">/ <span id="totalCount">0</span></span></p>
+                        <p class="text-neutral-500 mt-2">件</p>
+                    </div>
+                    <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold text-neutral-700 mb-4 text-center">事例の事業所種別 分布</h2>
+                        <div class="chart-container">
+                            <canvas id="serviceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="gallery">
+                <div id="caseGallery" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                </div>
+                <p id="noResults" class="text-center text-xl text-neutral-500 py-16 hidden">該当する事例はありません。</p>
+                <p id="loading" class="text-center text-xl text-neutral-500 py-16">読み込み中...</p>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Global state
+        let allCases = [];
+        let isAdminMode = false;
+        let serviceChart = null;
+        const ADMIN_PASSWORD = '0325';
+
+        // DOM Elements
+        const elements = {
+            caseGallery: document.getElementById('caseGallery'),
+            searchInput: document.getElementById('searchInput'),
+            roleFilter: document.getElementById('roleFilter'),
+            serviceFilter: document.getElementById('serviceFilter'),
+            taskFilter: document.getElementById('taskFilter'),
+            resetFilters: document.getElementById('resetFilters'),
+            displayedCount: document.getElementById('displayedCount'),
+            totalCount: document.getElementById('totalCount'),
+            noResults: document.getElementById('noResults'),
+            loading: document.getElementById('loading'),
+            
+            detailModal: document.getElementById('detailModal'),
+            closeDetailModal: document.getElementById('closeDetailModal'),
+            detailModalTitle: document.getElementById('detailModalTitle'),
+            detailUseCase: document.getElementById('detailUseCase'),
+            detailResult: document.getElementById('detailResult'),
+            detailWelfare: document.getElementById('detailWelfare'),
+            detailVideo: document.getElementById('detailVideo'),
+            
+            editModal: document.getElementById('editModal'),
+            closeEditModal: document.getElementById('closeEditModal'),
+            editModalTitle: document.getElementById('editModalTitle'),
+            editForm: document.getElementById('editForm'),
+            editRecordId: document.getElementById('editRecordId'),
+            editTitle: document.getElementById('editTitle'),
+            editRole: document.getElementById('editRole'),
+            editServiceType: document.getElementById('editServiceType'),
+            editTask: document.getElementById('editTask'),
+            editUseCase: document.getElementById('editUseCase'),
+            editResult: document.getElementById('editResult'),
+            editWelfare: document.getElementById('editWelfare'),
+            editVideoUrl: document.getElementById('editVideoUrl'),
+            cancelEdit: document.getElementById('cancelEdit'),
+            
+            passwordModal: document.getElementById('passwordModal'),
+            passwordForm: document.getElementById('passwordForm'),
+            passwordInput: document.getElementById('passwordInput'),
+            passwordError: document.getElementById('passwordError'),
+            cancelPassword: document.getElementById('cancelPassword'),
+            
+            adminToggle: document.getElementById('adminToggle'),
+            adminBadge: document.getElementById('adminBadge'),
+            addCaseBtn: document.getElementById('addCaseBtn')
+        };
+
+        // API Functions
+        async function loadCases() {
+            try {
+                const response = await fetch('tables/cases?limit=1000');
+                if (!response.ok) throw new Error('Failed to load cases');
+                const data = await response.json();
+                allCases = data.data || [];
+                elements.loading.style.display = 'none';
+                return allCases;
+            } catch (error) {
+                console.error('Error loading cases:', error);
+                elements.loading.textContent = 'データの読み込みに失敗しました。';
+                return [];
+            }
+        }
+
+        async function createCase(caseData) {
+            try {
+                const response = await fetch('tables/cases', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(caseData)
+                });
+                if (!response.ok) throw new Error('Failed to create case');
+                return await response.json();
+            } catch (error) {
+                console.error('Error creating case:', error);
+                alert('事例の作成に失敗しました。');
+                return null;
+            }
+        }
+
+        async function updateCase(recordId, caseData) {
+            try {
+                const response = await fetch(`tables/cases/${recordId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(caseData)
+                });
+                if (!response.ok) throw new Error('Failed to update case');
+                return await response.json();
+            } catch (error) {
+                console.error('Error updating case:', error);
+                alert('事例の更新に失敗しました。');
+                return null;
+            }
+        }
+
+        async function deleteCase(recordId) {
+            try {
+                const response = await fetch(`tables/cases/${recordId}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) throw new Error('Failed to delete case');
+                return true;
+            } catch (error) {
+                console.error('Error deleting case:', error);
+                alert('事例の削除に失敗しました。');
+                return false;
+            }
+        }
+
+        // Modal Functions
+        function showModal(modalElement) {
+            modalElement.classList.remove('hidden');
+            setTimeout(() => {
+                modalElement.classList.add('opacity-100');
+                modalElement.querySelector('.modal-content').classList.add('scale-100');
+                modalElement.querySelector('.modal-content').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function hideModal(modalElement) {
+            modalElement.querySelector('.modal-content').classList.remove('scale-100');
+            modalElement.querySelector('.modal-content').classList.add('scale-95');
+            modalElement.classList.remove('opacity-100');
+            setTimeout(() => {
+                modalElement.classList.add('hidden');
+            }, 300);
+        }
+
+        function showDetailModal(caseData) {
+            elements.detailModalTitle.textContent = caseData.title;
+            elements.detailUseCase.textContent = caseData.useCase;
+            elements.detailResult.textContent = caseData.result;
+            elements.detailWelfare.textContent = caseData.welfare;
+
+            if (caseData.videoUrl && caseData.videoUrl.trim()) {
+                elements.detailVideo.innerHTML = `<a href="${caseData.videoUrl}" target="_blank" rel="noopener noreferrer" class="text-sky-600 hover:text-sky-800 hover:underline break-all">${caseData.videoUrl}</a>`;
+            } else {
+                elements.detailVideo.innerHTML = `<p>Coming soon</p>`;
+            }
+
+            showModal(elements.detailModal);
+        }
+
+        function showEditModal(caseData = null) {
+            if (caseData) {
+                elements.editModalTitle.textContent = '事例を編集';
+                elements.editRecordId.value = caseData.id;
+                elements.editTitle.value = caseData.title;
+                elements.editRole.value = caseData.role;
+                elements.editServiceType.value = caseData.service_type;
+                elements.editTask.value = caseData.task;
+                elements.editUseCase.value = caseData.useCase;
+                elements.editResult.value = caseData.result;
+                elements.editWelfare.value = caseData.welfare;
+                elements.editVideoUrl.value = caseData.videoUrl || '';
+            } else {
+                elements.editModalTitle.textContent = '新しい事例を追加';
+                elements.editForm.reset();
+                elements.editRecordId.value = '';
+            }
+            showModal(elements.editModal);
+        }
+
+        function showPasswordModal() {
+            elements.passwordInput.value = '';
+            elements.passwordError.classList.add('hidden');
+            showModal(elements.passwordModal);
+        }
+
+        // Admin Mode
+        function toggleAdminMode(enable) {
+            isAdminMode = enable;
+            if (enable) {
+                elements.adminBadge.classList.remove('hidden');
+                elements.addCaseBtn.classList.remove('hidden');
+                elements.adminToggle.textContent = '管理者モード終了';
+                elements.adminToggle.classList.remove('bg-sky-600', 'hover:bg-sky-700');
+                elements.adminToggle.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                elements.adminBadge.classList.add('hidden');
+                elements.addCaseBtn.classList.add('hidden');
+                elements.adminToggle.textContent = '管理者モード';
+                elements.adminToggle.classList.remove('bg-red-600', 'hover:bg-red-700');
+                elements.adminToggle.classList.add('bg-sky-600', 'hover:bg-sky-700');
+            }
+            renderCards();
+        }
+
+        // Filters
+        function populateFilters() {
+            const roles = ['all', ...new Set(allCases.map(c => c.role))];
+            const services = ['all', ...new Set(allCases.map(c => c.service_type))];
+            const tasks = ['all', ...new Set(allCases.map(c => c.task))];
+
+            const createOptions = (selectEl, items) => {
+                selectEl.innerHTML = '';
+                items.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item;
+                    option.textContent = item === 'all' ? `すべて（${items.length - 1}）` : item;
+                    selectEl.appendChild(option);
+                });
+            };
+
+            createOptions(elements.roleFilter, roles);
+            createOptions(elements.serviceFilter, services);
+            createOptions(elements.taskFilter, tasks);
+        }
+
+        // Render
+        function renderCards() {
+            elements.caseGallery.innerHTML = '';
+            allCases.forEach(c => {
+                const card = document.createElement('div');
+                card.className = 'case-card bg-white p-6 rounded-lg shadow-md border border-transparent hover:border-sky-500';
+                
+                const fullText = `${c.title} ${c.useCase} ${c.result} ${c.welfare} ${c.role} ${c.service_type} ${c.task}`.toLowerCase();
+                card.dataset.textContent = fullText;
+                card.dataset.role = c.role;
+                card.dataset.service = c.service_type;
+                card.dataset.task = c.task;
+
+                let adminButtons = '';
+                if (isAdminMode) {
+                    adminButtons = `
+                        <div class="flex gap-2 mt-4">
+                            <button class="edit-btn flex-1 px-3 py-1.5 bg-amber-500 text-white rounded text-sm hover:bg-amber-600" data-id="${c.id}">編集</button>
+                            <button class="delete-btn flex-1 px-3 py-1.5 bg-red-500 text-white rounded text-sm hover:bg-red-600" data-id="${c.id}">削除</button>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="cursor-pointer view-detail" data-id="${c.id}">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-xl font-bold text-sky-700 h-14 line-clamp-2">${c.title}</h3>
+                            <span class="text-xs font-medium bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full shrink-0 ml-2">${c.service_type}</span>
+                        </div>
+                        <p class="text-neutral-700 mb-4 h-24 overflow-hidden text-ellipsis line-clamp-4">${c.useCase}</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="text-xs font-medium bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded-full">${c.role}</span>
+                            <span class="text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">${c.task}</span>
+                        </div>
+                    </div>
+                    ${adminButtons}
+                `;
+                elements.caseGallery.appendChild(card);
+            });
+
+            // Attach event listeners
+            document.querySelectorAll('.view-detail').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const caseData = allCases.find(c => c.id === el.dataset.id);
+                    if (caseData) showDetailModal(caseData);
+                });
+            });
+
+            if (isAdminMode) {
+                document.querySelectorAll('.edit-btn').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const caseData = allCases.find(c => c.id === el.dataset.id);
+                        if (caseData) showEditModal(caseData);
+                    });
+                });
+
+                document.querySelectorAll('.delete-btn').forEach(el => {
+                    el.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const caseData = allCases.find(c => c.id === el.dataset.id);
+                        if (caseData && confirm(`「${caseData.title}」を削除してもよろしいですか？`)) {
+                            const success = await deleteCase(caseData.id);
+                            if (success) {
+                                allCases = allCases.filter(c => c.id !== caseData.id);
+                                populateFilters();
+                                renderCards();
+                                updateView();
+                                initChart();
+                            }
+                        }
+                    });
+                });
+            }
+
+            updateView();
+        }
+
+        function updateView() {
+            const searchText = elements.searchInput.value.toLowerCase();
+            const selectedRole = elements.roleFilter.value;
+            const selectedService = elements.serviceFilter.value;
+            const selectedTask = elements.taskFilter.value;
+
+            let count = 0;
+            const cards = elements.caseGallery.querySelectorAll('.case-card');
+
+            Array.from(cards).forEach(card => {
+                const textMatch = card.dataset.textContent.includes(searchText);
+                const roleMatch = selectedRole === 'all' || card.dataset.role === selectedRole;
+                const serviceMatch = selectedService === 'all' || card.dataset.service === selectedService;
+                const taskMatch = selectedTask === 'all' || card.dataset.task === selectedTask;
+
+                if (textMatch && roleMatch && serviceMatch && taskMatch) {
+                    card.style.display = 'block';
+                    count++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            elements.displayedCount.textContent = count;
+            elements.totalCount.textContent = allCases.length;
+            elements.noResults.style.display = count === 0 ? 'block' : 'none';
+        }
+
+        function formatChartLabel(label) {
+            if (label.length > 10) {
+                return label.match(/.{1,10}/g);
+            }
+            return label;
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('serviceChart').getContext('2d');
+            const serviceCounts = allCases.reduce((acc, c) => {
+                acc[c.service_type] = (acc[c.service_type] || 0) + 1;
+                return acc;
+            }, {});
+
+            const labels = Object.keys(serviceCounts).map(formatChartLabel);
+            const data = Object.values(serviceCounts);
+
+            if (serviceChart) {
+                serviceChart.destroy();
+            }
+
+            serviceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '事例件数',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(14, 165, 233, 0.6)',
+                            'rgba(245, 158, 11, 0.6)',
+                            'rgba(16, 185, 129, 0.6)',
+                            'rgba(239, 68, 68, 0.6)',
+                            'rgba(139, 92, 246, 0.6)',
+                            'rgba(217, 70, 239, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(14, 165, 233, 1)',
+                            'rgba(245, 158, 11, 1)',
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(139, 92, 246, 1)',
+                            'rgba(217, 70, 239, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y + ' 件';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                autoSkip: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Event Listeners
+        elements.closeDetailModal.addEventListener('click', () => hideModal(elements.detailModal));
+        elements.detailModal.addEventListener('click', (e) => {
+            if (e.target === elements.detailModal) hideModal(elements.detailModal);
+        });
+
+        elements.closeEditModal.addEventListener('click', () => hideModal(elements.editModal));
+        elements.cancelEdit.addEventListener('click', () => hideModal(elements.editModal));
+        elements.editModal.addEventListener('click', (e) => {
+            if (e.target === elements.editModal) hideModal(elements.editModal);
+        });
+
+        elements.cancelPassword.addEventListener('click', () => hideModal(elements.passwordModal));
+        elements.passwordModal.addEventListener('click', (e) => {
+            if (e.target === elements.passwordModal) hideModal(elements.passwordModal);
+        });
+
+        elements.editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const caseData = {
+                title: elements.editTitle.value,
+                role: elements.editRole.value,
+                service_type: elements.editServiceType.value,
+                task: elements.editTask.value,
+                useCase: elements.editUseCase.value,
+                result: elements.editResult.value,
+                welfare: elements.editWelfare.value,
+                videoUrl: elements.editVideoUrl.value || null
+            };
+
+            const recordId = elements.editRecordId.value;
+            let result;
+            
+            if (recordId) {
+                // Update existing
+                result = await updateCase(recordId, caseData);
+                if (result) {
+                    const index = allCases.findIndex(c => c.id === recordId);
+                    if (index !== -1) {
+                        allCases[index] = result;
+                    }
+                }
+            } else {
+                // Create new
+                result = await createCase(caseData);
+                if (result) {
+                    allCases.push(result);
+                }
+            }
+
+            if (result) {
+                hideModal(elements.editModal);
+                populateFilters();
+                renderCards();
+                initChart();
+            }
+        });
+
+        elements.passwordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const password = elements.passwordInput.value;
+            
+            if (password === ADMIN_PASSWORD) {
+                hideModal(elements.passwordModal);
+                toggleAdminMode(true);
+            } else {
+                elements.passwordError.classList.remove('hidden');
+            }
+        });
+
+        elements.adminToggle.addEventListener('click', () => {
+            if (isAdminMode) {
+                toggleAdminMode(false);
+            } else {
+                showPasswordModal();
+            }
+        });
+
+        elements.addCaseBtn.addEventListener('click', () => {
+            showEditModal();
+        });
+
+        elements.searchInput.addEventListener('keyup', updateView);
+        elements.roleFilter.addEventListener('change', updateView);
+        elements.serviceFilter.addEventListener('change', updateView);
+        elements.taskFilter.addEventListener('change', updateView);
+        elements.resetFilters.addEventListener('click', () => {
+            elements.searchInput.value = '';
+            elements.roleFilter.value = 'all';
+            elements.serviceFilter.value = 'all';
+            elements.taskFilter.value = 'all';
+            updateView();
+        });
+
+        // Initialize
+        async function init() {
+            await loadCases();
+            populateFilters();
+            renderCards();
+            initChart();
+        }
+
+        init();
+    </script>
+</body>
+</html>
